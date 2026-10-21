@@ -1,0 +1,64 @@
+{
+ "params": {
+  "cols": 5,
+  "rows": 2,
+  "pitch_x": 21.0,
+  "pitch_y": 20.0,
+  "floor_t": 4.0,
+  "rim_gap": 1.0,
+  "boss_clear": 0.15,
+  "boss_corner_r": 1.0,
+  "boss_top_chamfer": 0.2,
+  "slot_clear": 0.15,
+  "slot_chamfer": 0.15,
+  "moat_w": 0.6,
+  "moat_d": 0.4,
+  "moat_gap": 0.3,
+  "margin": 4.0,
+  "standoff_d": 9.0,
+  "wall_fillet": 1.5,
+  "m3_clear": 3.4,
+  "m3_nut_af": 5.7,
+  "m3_nut_top": 0.5,
+  "clamp_t": 4.0,
+  "clamp_gap": 1.2,
+  "pad_x": 10.0,
+  "pad_y": 7.2,
+  "pad_r": 1.5,
+  "pad_interference": 0.5,
+  "pad_min_len": 3.0,
+  "peg_x": 6.0,
+  "peg_y": 3.6,
+  "peg_key": 1.2,
+  "peg_h": 2.5,
+  "peg_clear": 0.0,
+  "socket_extra": 0.3,
+  "pad_min_floor": 1.2
+ },
+ "boss_top": 2.8,
+ "clamp_underside": 11.25,
+ "pad_normal": {
+  "min_length": 6.05,
+  "socket_floor": 4.29,
+  "face_z": [
+   3.65,
+   5.2
+  ]
+ },
+ "pad_home": {
+  "min_length": 6.05,
+  "socket_floor": 3.67,
+  "face_z": [
+   3.71,
+   5.2
+  ]
+ },
+ "pad_raised": {
+  "min_length": 2.77,
+  "socket_floor": 1.81,
+  "face_z": [
+   5.09,
+   8.48
+  ]
+ }
+}
