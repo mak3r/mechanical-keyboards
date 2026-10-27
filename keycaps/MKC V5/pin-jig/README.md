@@ -11,7 +11,7 @@ All four V5 keycaps share the same underside: flat at z=1.8 above the rim, with 
 - **Height and angle:** the boss's flat top is the datum. The pin's 8.5×4 base face and the keycap's underside both rest on that same face, so the pin ends up flush with the underside and square to it, the way it is modelled.
 - **Position and rotation:** the boss walls match the skirt draft (0.15 mm clearance, chosen from the fit test), so the cap centres itself as it drops on. Two through slots hold the pin legs (0.15 mm clearance per side, chosen from the fit test), so the pin can't twist or slide.
 - **Squeeze-out:** a shallow groove around the pin base catches excess slurry so it doesn't lift the cap off the datum.
-- **Pressure:** a clamp plate with TPU pads, each shaped to its cap's top surface, pushes every cap down onto its boss. The plate bottoms out on a solid end wall at each end of the base, so every pad compresses by the same 0.5 mm, whatever the cap type. The pads stay clear of the light-bar slots.
+- **Pressure:** a clamp plate with TPU pads, each shaped to cover its cap's whole top surface, pushes every cap down onto its boss. The plate bottoms out on a solid end wall at each end of the base, so every pad compresses by the same 0.5 mm, whatever the cap type. Each pad covers the whole top, light-bar slot included, and reaches just past the raised crest along each edge, so it seats on the cap like a lid and can't rock. It presses evenly everywhere, even on the sloped raised caps.
 
 ## Parts
 
@@ -21,7 +21,7 @@ All four V5 keycaps share the same underside: flat at z=1.8 above the rim, with 
 | `pinjig_clamp.stl` | PETG | 1 | Plate with 10 keyed pegs on its underside. It's exported flat side down with the pegs pointing up, so it prints without supports. |
 | `pinjig_pads/pinjig_pad_normal.stl` | TPU 95A | per normal cap | Exported flat back down, with the shaped face on top and the keyed socket open to the bed. Prints without supports; the only bridge is the 3.6 mm socket ceiling. 2 walls, ~15% gyroid, so it stays soft. |
 | `pinjig_pads/pinjig_pad_home.stl` | TPU 95A | per home cap | Has a relief for the homing bump. |
-| `pinjig_pads/pinjig_pad_raised.stl` | TPU 95A | per raised cap | The same pad works for raised-lower and raised-upper (their tops match within 0.01 mm). |
+| `pinjig_pads/pinjig_pad_raised.stl` | TPU 95A | per raised cap | The same pad works for raised-lower and raised-upper. Their tops match within 0.01 mm, and the pad bridges both light-bar positions. Thinnest point 1.7 mm, at the tall edge. |
 | `pinjig_fit_test.stl` | PETG | 1 | Four single bosses at 0.05 / 0.10 / 0.15 / 0.20 mm clearance (1–4 dots). Print this first with the same settings as the base. |
 
 Hardware: 4× M3×18 socket head screws and 4× M3 nuts. Each nut presses up into the hex trap under the base.

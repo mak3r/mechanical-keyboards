@@ -37,7 +37,7 @@ P = dict(
     margin=4.0,                 # base border outside the keycap grid
     standoff_d=9.0, wall_fillet=1.5, m3_clear=3.4, m3_nut_af=5.7, m3_nut_top=0.5,   # M3x18 SHCS from the top, nut pushed up to the top of its trap
     clamp_t=4.0, clamp_gap=1.2, # clamp underside sits this far above the tallest cap
-    pad_x=10.0, pad_y=7.2, pad_r=1.5,       # pad footprint (keeps off the light-bar slots)
+    pad_x=14.6, pad_y=13.8, pad_r=2.0,      # pad footprint: the whole cap top, out past the edge crest
     pad_interference=0.5,       # how far each pad is pushed into the cap top
     pad_min_len=3.0,
     peg_x=6.0, peg_y=3.6, peg_key=1.2, peg_h=2.5, peg_clear=0.0,   # peg is on the clamp, socket in the pad
@@ -196,30 +196,41 @@ def build_clamp():
     return plate - mf.Manifold.batch_boolean(cuts, mf.OpType.Add)
 
 
-def top_surface(stl):
-    m = trimesh.load(stl)
-    body = max(m.split(only_watertight=False), key=lambda p: len(p.faces))
+def top_surface(stls):
+    """Cap top height map under the pad footprint. Several STLs are averaged
+    (raised-lower and raised-upper share one pad); the light-bar slot is a hole
+    in the top, so it is filled by interpolating across it as if the bar is flush."""
     res = 0.1
     xs = np.arange(-P['pad_x'] / 2 - 0.5413, P['pad_x'] / 2 + 0.6, res)   # grid offset so no line lies on a pad wall
     ys = np.arange(-P['pad_y'] / 2 - 0.5413, P['pad_y'] / 2 + 0.6, res)
     X, Y = np.meshgrid(xs, ys)
-    o = np.c_[X.ravel(), Y.ravel(), np.full(X.size, 50.0)]
-    loc, ri, _ = body.ray.intersects_location(o, np.tile([0, 0, -1.0], (X.size, 1)), multiple_hits=False)
-    Z = np.full(X.size, np.nan)
-    Z[ri] = loc[:, 2]
-    Z = Z.reshape(X.shape)
+    maps = []
+    for stl in stls:
+        m = trimesh.load(stl)
+        body = max(m.split(only_watertight=False), key=lambda p: len(p.faces))
+        o = np.c_[X.ravel(), Y.ravel(), np.full(X.size, 50.0)]
+        loc, ri, _ = body.ray.intersects_location(o, np.tile([0, 0, -1.0], (X.size, 1)), multiple_hits=False)
+        Z = np.full(X.size, np.nan)
+        Z[ri] = loc[:, 2]
+        maps.append(Z.reshape(X.shape))
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)   # all-NaN cells are filled below
+        Z = np.nanmean(np.stack(maps), axis=0)
     bad = np.isnan(Z)
-    if bad.mean() > 0.01:
-        raise SystemExit('gap in top surface under pad footprint for %s' % stl)
-    if bad.any():   # rays that slipped between triangles: take the nearest hit
-        from scipy.ndimage import distance_transform_edt
-        _, (iy, ix) = distance_transform_edt(bad, return_indices=True)
-        Z = Z[iy, ix]
+    if bad.mean() > 0.15:
+        raise SystemExit('too much of the top surface is missing under the pad for %s' % stls)
+    if bad.any():
+        from scipy.interpolate import griddata
+        pts = np.c_[X[~bad], Y[~bad]]
+        fill = griddata(pts, Z[~bad], (X[bad], Y[bad]), method='linear')
+        near = griddata(pts, Z[~bad], (X[bad], Y[bad]), method='nearest')
+        Z[bad] = np.where(np.isnan(fill), near, fill)
     return xs, ys, Z
 
 
-def build_pad(stl):
-    xs, ys, Z = top_surface(stl)
+def build_pad(stls):
+    xs, ys, Z = top_surface(stls)
     Zj = Z + KZ - P['pad_interference']          # pad face in jig frame
     # unit-height pad body, refined so the bottom can follow the cap surface, then
     # warped: z=0 -> conformal face, z=1 -> flat back at the clamp underside
@@ -240,9 +251,13 @@ def build_pad(stl):
     over = (abs(X) <= P['peg_x'] / 2 + 0.2) & (abs(Y) <= P['peg_y'] / 2 + 0.2)
     floor = (CLAMP_Z - depth) - float(Zj[over].max())
     if floor < P['pad_min_floor']:
-        raise SystemExit('pad floor under socket only %.2f mm for %s' % (floor, stl))
-    length = CLAMP_Z - float(Zj.max())
-    return pad, length, float(Zj.min()), float(Zj.max()), floor
+        raise SystemExit('pad floor under socket only %.2f mm for %s' % (floor, stls))
+    r = P['pad_r']
+    cx = np.clip(abs(X) - (P['pad_x'] / 2 - r), 0, None)
+    cy = np.clip(abs(Y) - (P['pad_y'] / 2 - r), 0, None)
+    foot = (abs(X) <= P['pad_x'] / 2) & (abs(Y) <= P['pad_y'] / 2) & (cx ** 2 + cy ** 2 <= r * r)
+    length = CLAMP_Z - float(Zj[foot].max())
+    return pad, length, float(Zj[foot].min()), float(Zj[foot].max()), floor
 
 
 def build_fit_test():
@@ -277,8 +292,8 @@ if __name__ == '__main__':
     flip = lambda m, z: m.rotate((180, 0, 0)).translate((0, 0, z))
     to_trimesh(flip(clamp, CLAMP_Z + P['clamp_t'])).export(os.path.join(out, 'pinjig_clamp.stl'))
     pads = {}
-    for name, stl in (('normal', 'normal'), ('home', 'normal-home'), ('raised', 'raised-lower')):
-        pad, length, zmin, zmax, floor = build_pad(os.path.join(capdir, stl + '.stl'))
+    for name, caps in (('normal', ['normal']), ('home', ['normal-home']), ('raised', ['raised-lower', 'raised-upper'])):
+        pad, length, zmin, zmax, floor = build_pad([os.path.join(capdir, c + '.stl') for c in caps])
         pads[name] = pad
         # print orientation: flat back on the bed, conformal face up (rotate, never mirror)
         to_trimesh(flip(pad, CLAMP_Z)).export(os.path.join(out, 'pinjig_pads', 'pinjig_pad_%s.stl' % name))

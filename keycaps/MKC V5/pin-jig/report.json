@@ -22,9 +22,9 @@
   "m3_nut_top": 0.5,
   "clamp_t": 4.0,
   "clamp_gap": 1.2,
-  "pad_x": 10.0,
-  "pad_y": 7.2,
-  "pad_r": 1.5,
+  "pad_x": 14.6,
+  "pad_y": 13.8,
+  "pad_r": 2.0,
   "pad_interference": 0.5,
   "pad_min_len": 3.0,
   "peg_x": 6.0,
@@ -38,27 +38,41 @@
  "boss_top": 2.8,
  "clamp_underside": 11.25,
  "pad_normal": {
-  "min_length": 6.05,
+  "min_length": 5.77,
   "socket_floor": 4.29,
   "face_z": [
    3.65,
-   5.2
+   5.48
   ]
  },
  "pad_home": {
-  "min_length": 6.05,
+  "min_length": 5.77,
   "socket_floor": 3.67,
   "face_z": [
    3.71,
-   5.2
+   5.48
   ]
  },
  "pad_raised": {
-  "min_length": 2.77,
+  "min_length": 1.71,
   "socket_floor": 1.81,
   "face_z": [
-   5.09,
-   8.48
+   4.89,
+   9.54
+  ]
+ },
+ "checks": {
+  "pin_x_base_mm3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
   ]
  }
 }
