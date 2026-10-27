@@ -1,7 +1,7 @@
 {
  "params": {
-  "cols": 5,
-  "rows": 2,
+  "cols": 3,
+  "rows": 3,
   "pitch_x": 21.0,
   "pitch_y": 20.0,
   "floor_t": 4.0,
@@ -14,14 +14,30 @@
   "moat_w": 0.6,
   "moat_d": 0.4,
   "moat_gap": 0.3,
-  "margin": 4.0,
-  "standoff_d": 9.0,
-  "wall_fillet": 1.5,
+  "frame_gap": 1.5,
+  "frame_w": 9.0,
+  "frame_r": 4.0,
+  "wall_fillet": 1.0,
+  "vent": 4.8,
+  "vent_pitch": 7.0,
+  "vent_z": 5.6,
+  "foot_h": 2.5,
+  "channel_w": 6.0,
   "m3_clear": 3.4,
-  "m3_nut_af": 5.7,
-  "m3_nut_top": 0.5,
-  "clamp_t": 4.0,
+  "key_bolt_y": 29.0,
+  "key_chamfer": 8.0,
+  "head_af": 5.5,
+  "head_h": 2.0,
+  "head_clear": 0.15,
+  "rib_w": 0.8,
+  "rib_interf": 0.12,
+  "bridge_layer": 0.3,
+  "clamp_t": 3.0,
   "clamp_gap": 1.2,
+  "rib_t": 2.0,
+  "rib_bottom": 4.0,
+  "screw_len": 20.0,
+  "min_thread": 4.0,
   "pad_x": 14.6,
   "pad_y": 13.8,
   "pad_r": 2.0,
@@ -37,6 +53,13 @@
  },
  "boss_top": 2.8,
  "clamp_underside": 11.25,
+ "head_bearing_z": -1.7,
+ "clamp_top_z": 14.25,
+ "screw_tip_z": 18.3,
+ "outline_mm": [
+  80.5,
+  77.5
+ ],
  "pad_normal": {
   "min_length": 5.77,
   "socket_floor": 4.29,
@@ -59,20 +82,6 @@
   "face_z": [
    4.89,
    9.54
-  ]
- },
- "checks": {
-  "pin_x_base_mm3": [
-   0.0,
-   0.0,
-   0.0,
-   0.0,
-   0.0,
-   0.0,
-   0.0,
-   0.0,
-   0.0,
-   0.0
   ]
  }
 }

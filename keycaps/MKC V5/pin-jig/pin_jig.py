@@ -24,7 +24,7 @@ import manifold3d as mf
 
 # ---------------------------------------------------------------- parameters
 P = dict(
-    cols=5, rows=2,             # keycaps per jig
+    cols=3, rows=3,             # keycaps per jig: 3x3 = one Corne half, three columns at a time
     pitch_x=21.0, pitch_y=20.0,
     floor_t=4.0,                # base plate thickness below the floor
     rim_gap=1.0,                # keycap rim floats this far above the floor
@@ -34,9 +34,19 @@ P = dict(
     slot_clear=0.15,            # per side, pin leg to slot
     slot_chamfer=0.15,
     moat_w=0.6, moat_d=0.4, moat_gap=0.3,   # squeeze-out groove around pin base
-    margin=4.0,                 # base border outside the keycap grid
-    standoff_d=9.0, wall_fillet=1.5, m3_clear=3.4, m3_nut_af=5.7, m3_nut_top=0.5,   # M3x18 SHCS from the top, nut pushed up to the top of its trap
-    clamp_t=4.0, clamp_gap=1.2, # clamp underside sits this far above the tallest cap
+    frame_gap=1.5,              # keycap skirt to frame inner face
+    frame_w=9.0, frame_r=4.0, wall_fillet=1.0,
+    vent=4.8, vent_pitch=7.0, vent_z=5.6,   # diamond vents through the frame sides (45 deg edges)
+    foot_h=2.5, channel_w=6.0,  # underside skid with an open air channel under each row of leg slots
+    m3_clear=3.4,
+    key_bolt_y=29.0,            # the +x,+y bolt sits off the corner, so the clamp fits only one way round
+    key_chamfer=8.0,            # matching cut corner on base and clamp, as a visual cue
+    head_af=5.5, head_h=2.0, head_clear=0.15,   # M3 hex-head screw, inserted from below
+    rib_w=0.8, rib_interf=0.12, # crush ribs in the head pocket (interference with the head flats)
+    bridge_layer=0.3,           # stepped sacrificial bridge above the head pocket
+    clamp_t=3.0, clamp_gap=1.2, # clamp plate; underside sits this far above the tallest cap
+    rib_t=2.0, rib_bottom=4.0,  # stiffening ribs under the clamp, between the rows and columns of caps
+    screw_len=20.0, min_thread=4.0,   # 20 mm screw must leave this much thread above the clamp for the wing nut
     pad_x=14.6, pad_y=13.8, pad_r=2.0,      # pad footprint: the whole cap top, out past the edge crest
     pad_interference=0.5,       # how far each pad is pushed into the cap top
     pad_min_len=3.0,
@@ -111,7 +121,7 @@ def leg_slots(slot_c, z0, z1):
 
 def arrow(z_top, depth=0.4):
     """Small engraved triangle pointing at -Y (the tall edge of raised caps)."""
-    tri = mf.CrossSection([[(1.6, 0.0), (-1.6, 0.0), (0.0, -1.8)]])
+    tri = mf.CrossSection([[(1.2, 0.0), (-1.2, 0.0), (0.0, -1.2)]])
     return tri.extrude(depth + 1).translate((0, 0, z_top - depth))
 
 
@@ -121,56 +131,115 @@ def positions():
     return [(x, y) for y in ys for x in xs]
 
 
+def frame_inner():
+    ix = (P['cols'] - 1) / 2 * P['pitch_x'] + 8.75 + P['frame_gap']
+    iy = (P['rows'] - 1) / 2 * P['pitch_y'] + 8.25 + P['frame_gap']
+    return ix, iy
+
+
 def outline():
-    hx = (P['cols'] - 1) / 2 * P['pitch_x'] + 8.75 + 1.5 + P['standoff_d'] + 3.0
-    hy = (P['rows'] - 1) / 2 * P['pitch_y'] + 8.25 + P['margin']
-    return hx, hy
+    ix, iy = frame_inner()
+    return ix + P['frame_w'], iy + P['frame_w']
+
+
+def outline_cs():
+    """Base/clamp footprint: rounded rectangle with the +x,+y corner cut off."""
+    hx, hy = outline()
+    c = P['key_chamfer']
+    cut = mf.CrossSection([[(hx - c, hy + 1), (hx + 1, hy - c), (hx + 1, hy + 1)]])
+    return rrect(hx, hy, P['frame_r']) - cut
 
 
 def standoff_xy():
-    # at the ends of the rows, clear of the keycap skirts
-    x = (P['cols'] - 1) / 2 * P['pitch_x'] + 8.75 + 1.5 + P['standoff_d'] / 2
-    y = (P['rows'] - 1) / 2 * P['pitch_y']
-    return [(sx * x, sy * y) for sx in (-1, 1) for sy in (-1, 1)]
+    # one bolt in each corner of the frame; the +x,+y one is moved along its
+    # side so the bolt pattern only matches with the clamp the right way round
+    ix, iy = frame_inner()
+    x, y = ix + P['frame_w'] / 2, iy + P['frame_w'] / 2
+    pts = [(sx * x, sy * y) for sx in (-1, 1) for sy in (-1, 1)]
+    pts[3] = (x, P['key_bolt_y'])
+    return pts
+
+
+def head_bearing_z():
+    """Z of the face the screw head pulls up against."""
+    return -P['floor_t'] + P['head_h'] + 0.3
+
+
+def head_pocket(x, y):
+    """Hex pocket for the screw head, open to the bed, with crush ribs on three
+    flats and a two-step sacrificial bridge above it so the ceiling prints flat
+    with no droop into the bolt hole."""
+    ft, fh = P['floor_t'], P['foot_h']
+    zb = head_bearing_z()
+    af = P['head_af'] + 2 * P['head_clear']
+    rc = af / 2 / np.cos(np.pi / 6)
+    hexs = mf.CrossSection.circle(rc, 6)          # flats face +-y, +-60 deg
+    pocket = hexs.extrude(zb + ft + fh + 1).translate((0, 0, -ft - fh - 1))
+    # ribs: half-round bumps standing proud of alternate flats
+    rr = P['rib_w'] / 2
+    ribs = []
+    for k in range(3):
+        ang = np.pi / 2 + k * 2 * np.pi / 3        # normals of flats
+        d = af / 2 + rr - (P['head_clear'] + P['rib_interf'])
+        ribs.append(mf.Manifold.cylinder(zb + ft + fh, rr, rr, 16)
+                    .translate((d * np.cos(ang), d * np.sin(ang), -ft - fh)))
+    pocket = pocket - mf.Manifold.batch_boolean(ribs, mf.OpType.Add)
+    bl, hole = P['bridge_layer'], P['m3_clear']
+    step1 = mf.Manifold.cube((hole, 2 * rc, bl)).translate((-hole / 2, -rc, zb))
+    step2 = mf.Manifold.cube((hole, hole, bl)).translate((-hole / 2, -hole / 2, zb + bl))
+    return (pocket + step1 + step2).translate((x, y, 0))
 
 
 def build_base():
     hx, hy = outline()
-    ft = P['floor_t']
-    base = slab(rrect(hx, hy, 3.0), -ft, ft)
+    ix, iy = frame_inner()
+    ft, fh = P['floor_t'], P['foot_h']
+    r = P['frame_r']
+    base = slab(outline_cs(), -ft, ft)
     for (x, y) in positions():
         base = base + boss(P['boss_clear'], P['slot_clear']).translate((x, y, 0))
-    # standoffs: one solid end wall per side instead of free-standing posts,
-    # with a 45 degree fillet where the inner face meets the floor
-    inner = (P['cols'] - 1) / 2 * P['pitch_x'] + 8.75 + 1.5
+    # closed frame: the clamp rests on all four sides; 45 degree fillet inside at the floor
     fil = P['wall_fillet']
-    for sx in (-1, 1):
-        box = mf.Manifold.cube((hx - inner + 1, 2 * hy + 2, CLAMP_Z)).translate((inner, -hy - 1, 0))
-        root = mf.Manifold.batch_hull([mf.Manifold.cube((hx - inner + fil, 2 * hy + 2, 0.01)).translate((inner - fil, -hy - 1, 0)),
-                                       mf.Manifold.cube((hx - inner, 2 * hy + 2, 0.01)).translate((inner, -hy - 1, fil))])
-        wall = (box + root) ^ slab(rrect(hx, hy, 3.0), 0.0, CLAMP_Z)
-        base = base + (wall if sx > 0 else wall.mirror((1, 0, 0)))
+    inner = mf.Manifold.batch_hull([slab(rrect(ix - fil, iy - fil, 1.0), 0.0, 0.01),
+                                    slab(rrect(ix, iy, 1.0), fil, 0.01),
+                                    slab(rrect(ix, iy, 1.0), CLAMP_Z + 1, 0.01)])
+    frame = slab(outline_cs(), 0.0, CLAMP_Z) - inner
+    # diamond vents through each side, clear of the corner bolts
+    v = P['vent'] / 2
+    dia = mf.CrossSection([[(v, 0.0), (0.0, v), (-v, 0.0), (0.0, -v)]])
+    vents = []
+    for span, along_x in ((ix, True), (iy, False)):
+        n = int((2 * (span - 3.0)) // P['vent_pitch']) + 1
+        for i in range(n):
+            t = (i - (n - 1) / 2) * P['vent_pitch']
+            if not along_x and abs(t - P['key_bolt_y']) < v + P['m3_clear'] / 2 + 0.8:
+                continue
+            if along_x:   # holes through the walls at +-y, running along x
+                hole = dia.extrude(2 * hy + 2).rotate((90, 0, 0)).translate((t, hy + 1, P['vent_z']))
+            else:         # holes through the walls at +-x, running along y
+                hole = dia.extrude(2 * hx + 2).rotate((0, 90, 0)).translate((-hx - 1, t, P['vent_z']))
+            vents.append(hole)
+    frame = frame - mf.Manifold.batch_boolean(vents, mf.OpType.Add)
+    base = base + frame
+    # skid under the floor, with an air channel along each row so the bottoms
+    # of the leg slots stay open to the room; channel roofs are short bridges
+    skid = slab(outline_cs(), -ft - fh, fh + 0.01)
+    chans = [mf.Manifold.cube((2 * hx + 2, P['channel_w'], fh + 1)).translate((-hx - 1, y - P['channel_w'] / 2, -ft - fh - 1))
+             for y in sorted(set(p[1] for p in positions()))]
+    base = base + (skid - mf.Manifold.batch_boolean(chans, mf.OpType.Add))
     cuts = []
     for (x, y) in positions():
         cuts.append(leg_slots(P['slot_clear'], -ft, BOSS_TOP).translate((x, y, 0)))
-        cuts.append(arrow(0.0).translate((x, y - 8.9, 0)))
+        cuts.append(arrow(0.0).translate((x, y - 7.4, 0)))
     for (x, y) in standoff_xy():
         cuts.append(mf.Manifold.cylinder(CLAMP_Z + ft + 2, P['m3_clear'] / 2, P['m3_clear'] / 2, 32).translate((x, y, -ft - 1)))
-        # hex trap open to the bed; its ceiling tapers up to the bolt hole at
-        # 45 degrees or steeper so it prints without bridging or drooping
-        rc = P['m3_nut_af'] / 2 / np.cos(np.pi / 6) + 0.1
-        nut = mf.CrossSection.circle(rc, 6)
-        zt = P['m3_nut_top']
-        cuts.append(nut.extrude(ft + zt + 1).translate((x, y, -ft - 1)))
-        cuts.append(mf.Manifold.batch_hull([nut.extrude(0.01).translate((x, y, zt - 0.01)),
-                                            mf.Manifold.cylinder(0.01, P['m3_clear'] / 2, P['m3_clear'] / 2, 32)
-                                            .translate((x, y, zt + rc - P['m3_clear'] / 2))]))
+        cuts.append(head_pocket(x, y))
     return base - mf.Manifold.batch_boolean(cuts, mf.OpType.Add)
 
 
 def peg_cs(clear=0.0):
     hx, hy, k = P['peg_x'] / 2 + clear, P['peg_y'] / 2 + clear, P['peg_key']
-    # rectangle with one chamfered corner (-x,-y) so the pad only fits one way
+    # rectangle with one chamfered corner (-x,-y) so the pad only fits one way round
     return mf.CrossSection([[(-hx + k, -hy), (hx, -hy), (hx, hy), (-hx, hy), (-hx, -hy + k)]])
 
 
@@ -184,15 +253,29 @@ def peg(z_root):
 
 
 def build_clamp():
+    """Thin plate (so a 20 mm screw leaves room for the wing nut) stiffened by a
+    grid of ribs that hang down in the gaps between the caps and pads. Printed
+    upside down: flat top on the bed, ribs and pegs pointing up."""
     hx, hy = outline()
-    plate = slab(rrect(hx, hy, 3.0), CLAMP_Z, P['clamp_t'])
-    cuts = []
-    pegs = []
-    for (x, y) in positions():
-        pegs.append(peg(CLAMP_Z).translate((x, y, 0)))
-    plate = plate + mf.Manifold.batch_boolean(pegs, mf.OpType.Add)
-    for (x, y) in standoff_xy():
-        cuts.append(mf.Manifold.cylinder(P['clamp_t'] + 2, P['m3_clear'] / 2, P['m3_clear'] / 2, 32).translate((x, y, CLAMP_Z - 1)))
+    ix, iy = frame_inner()
+    tip = head_bearing_z() + P['screw_len']
+    if CLAMP_Z + P['clamp_t'] > tip - P['min_thread'] + 1e-6:
+        raise SystemExit('screw too short: only %.2f mm of thread above the clamp'
+                         % (tip - CLAMP_Z - P['clamp_t']))
+    plate = slab(outline_cs(), CLAMP_Z, P['clamp_t'])
+    adds = [peg(CLAMP_Z).translate((x, y, 0)) for (x, y) in positions()]
+    h = CLAMP_Z - P['rib_bottom']
+    t = P['rib_t']
+    e = 0.5   # stop short of the frame's inner face
+    for k in range(1, P['rows']):
+        y = (k - P['rows'] / 2) * P['pitch_y']
+        adds.append(mf.Manifold.cube((2 * (ix - e), t, h + 0.01)).translate((-(ix - e), y - t / 2, P['rib_bottom'])))
+    for k in range(1, P['cols']):
+        x = (k - P['cols'] / 2) * P['pitch_x']
+        adds.append(mf.Manifold.cube((t, 2 * (iy - e), h + 0.01)).translate((x - t / 2, -(iy - e), P['rib_bottom'])))
+    plate = plate + mf.Manifold.batch_boolean(adds, mf.OpType.Add)
+    cuts = [mf.Manifold.cylinder(P['clamp_t'] + 2, P['m3_clear'] / 2, P['m3_clear'] / 2, 32).translate((x, y, CLAMP_Z - 1))
+            for (x, y) in standoff_xy()]
     return plate - mf.Manifold.batch_boolean(cuts, mf.OpType.Add)
 
 
@@ -284,7 +367,10 @@ if __name__ == '__main__':
                   for n in ('normal', 'normal-home', 'raised-lower', 'raised-upper'))
     CLAMP_Z = round(KZ + tallest + P['clamp_gap'], 2)
 
-    report = dict(params=P, boss_top=BOSS_TOP, clamp_underside=CLAMP_Z)
+    report = dict(params=P, boss_top=BOSS_TOP, clamp_underside=CLAMP_Z,
+                  head_bearing_z=head_bearing_z(), clamp_top_z=CLAMP_Z + P['clamp_t'],
+                  screw_tip_z=head_bearing_z() + P['screw_len'],
+                  outline_mm=[2 * v for v in outline()])
     base = build_base()
     to_trimesh(base).export(os.path.join(out, 'pinjig_base.stl'))
     clamp = build_clamp()
@@ -306,7 +392,7 @@ if __name__ == '__main__':
         json.dump(report, open(os.path.join(out, 'report.json'), 'w'), indent=1)
         print(json.dumps(report, indent=1))
         sys.exit(0)
-    cap_names = ['normal', 'normal-home', 'raised-lower', 'raised-upper', 'normal'] * 2
+    cap_names = ['raised-lower'] * 3 + ['normal', 'normal-home', 'normal'] + ['raised-upper'] * 3
     pin = trimesh.load(pin_stl)
     scene = [to_trimesh(base), to_trimesh(clamp)]
     checks = {}
