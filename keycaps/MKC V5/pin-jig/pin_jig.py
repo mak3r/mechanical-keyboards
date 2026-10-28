@@ -131,6 +131,36 @@ def positions():
     return [(x, y) for y in ys for x in xs]
 
 
+# Keyboard layout, front row (-Y, nearest you) to back row (+Y, the cut-corner
+# side). Each cap sits the way it does on the board: light-bar slot to the back,
+# home bump to the front, and the tall edge of each raised cap facing away from
+# the home row. In the keycap STLs the light bar and the raised tall edge are
+# at -y (except raised-lower, whose bar is at +y), so every cap except
+# raised-lower is turned 180 deg. Its pad and peg turn with it, which is why the
+# same three pads still fit.
+ROWS = (('lower', 'raised-lower', 0),
+        ('home', 'normal', 180),
+        ('upper', 'raised-upper', 180))
+PAD_OF = {'normal': 'normal', 'normal-home': 'home', 'raised-lower': 'raised', 'raised-upper': 'raised'}
+
+
+def layout():
+    """(x, y, cap name, pad name, rotation about Z) for every socket."""
+    out = []
+    for i, (x, y) in enumerate(positions()):
+        r, c = divmod(i, P['cols'])
+        _, cap, rot = ROWS[r]
+        if cap == 'normal' and c == P['cols'] // 2:
+            cap = 'normal-home'   # index finger is the centre column of the inner three, on both halves
+        out.append((x, y, cap, PAD_OF[cap], rot))
+    return out
+
+
+def bar_mark(depth=0.4):
+    """Short engraved dash: the light-bar slot goes on this side."""
+    return mf.Manifold.cube((3.0, 0.8, depth + 1)).translate((-1.5, -0.4, -depth))
+
+
 def frame_inner():
     ix = (P['cols'] - 1) / 2 * P['pitch_x'] + 8.75 + P['frame_gap']
     iy = (P['rows'] - 1) / 2 * P['pitch_y'] + 8.25 + P['frame_gap']
@@ -228,9 +258,15 @@ def build_base():
              for y in sorted(set(p[1] for p in positions()))]
     base = base + (skid - mf.Manifold.batch_boolean(chans, mf.OpType.Add))
     cuts = []
-    for (x, y) in positions():
+    for (x, y, cap, _, rot) in layout():
         cuts.append(leg_slots(P['slot_clear'], -ft, BOSS_TOP).translate((x, y, 0)))
-        cuts.append(arrow(0.0).translate((x, y - 7.4, 0)))
+        # light-bar side: two dashes at the back edge of every socket
+        for dx in (-4.5, 4.5):
+            cuts.append(bar_mark().translate((x + dx, y + 8.0, 0)))
+        # tall edge of a raised cap: triangle pointing out from the home row
+        if cap.startswith('raised'):
+            sgn = 1 if rot == 0 else -1          # arrow() points -y, i.e. at the tall edge in the keycap frame
+            cuts.append(arrow(0.0).rotate((0, 0, rot)).translate((x, y - sgn * 7.4, 0)))
     for (x, y) in standoff_xy():
         cuts.append(mf.Manifold.cylinder(CLAMP_Z + ft + 2, P['m3_clear'] / 2, P['m3_clear'] / 2, 32).translate((x, y, -ft - 1)))
         cuts.append(head_pocket(x, y))
@@ -263,7 +299,7 @@ def build_clamp():
         raise SystemExit('screw too short: only %.2f mm of thread above the clamp'
                          % (tip - CLAMP_Z - P['clamp_t']))
     plate = slab(outline_cs(), CLAMP_Z, P['clamp_t'])
-    adds = [peg(CLAMP_Z).translate((x, y, 0)) for (x, y) in positions()]
+    adds = [peg(CLAMP_Z).rotate((0, 0, rot)).translate((x, y, 0)) for (x, y, _, _, rot) in layout()]
     h = CLAMP_Z - P['rib_bottom']
     t = P['rib_t']
     e = 0.5   # stop short of the frame's inner face
@@ -392,18 +428,17 @@ if __name__ == '__main__':
         json.dump(report, open(os.path.join(out, 'report.json'), 'w'), indent=1)
         print(json.dumps(report, indent=1))
         sys.exit(0)
-    cap_names = ['raised-lower'] * 3 + ['normal', 'normal-home', 'normal'] + ['raised-upper'] * 3
     pin = trimesh.load(pin_stl)
     scene = [to_trimesh(base), to_trimesh(clamp)]
     checks = {}
-    for (x, y), n in zip(positions(), cap_names):
+    for (x, y, n, padn, rot) in layout():
+        turn = trimesh.transformations.rotation_matrix(np.radians(rot), (0, 0, 1))
         cap = trimesh.load(os.path.join(capdir, n + '.stl'))
         body = max(cap.split(only_watertight=False), key=lambda p: len(p.faces))
-        body.apply_translation((x, y, KZ)); scene.append(body)
-        p = pin.copy(); p.apply_translation((x, y, KZ)); scene.append(p)
-        padn = {'normal': 'normal', 'normal-home': 'home'}.get(n, 'raised')
-        scene.append(to_trimesh(pads[padn].translate((x, y, 0))))
-        # interference: pin vs base, cap vs base
+        body.apply_transform(turn); body.apply_translation((x, y, KZ)); scene.append(body)
+        p = pin.copy(); p.apply_transform(turn); p.apply_translation((x, y, KZ)); scene.append(p)
+        scene.append(to_trimesh(pads[padn].rotate((0, 0, rot)).translate((x, y, 0))))
+        # interference: pin vs base
         inter = (from_trimesh(p) ^ base).volume()
         checks.setdefault('pin_x_base_mm3', []).append(round(inter, 4))
     report['checks'] = checks

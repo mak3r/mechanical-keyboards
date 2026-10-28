@@ -17,18 +17,27 @@ All four V5 keycaps share the same underside: flat at z=1.8 above the rim, with 
 
 ## Layout
 
-v4 is a 3×3 grid, which is one Corne half, three columns at a time. A half takes two runs and the whole board takes four.
+v5 is a 3×3 grid laid out like one Corne half, three columns at a time. A half takes two runs and the whole board takes four. Hold the jig with the cut corner at the back right. Then the rows read the same as on the keyboard, and every cap faces the way it will sit on the board.
 
-Every socket is the same, so any cap can go in any of the nine positions. Lay out whatever mix of caps you have, then fit the matching pad above each one: a normal pad over a normal cap, a home pad over a home cap, and a raised pad over a raised-lower or raised-upper cap. All the pads have the same keyed socket, so any pad fits any clamp peg.
+| Jig row | Caps | Which way the cap faces | Pad |
+|---|---|---|---|
+| Back (upper) | raised-upper | Tall edge to the back, at the triangle | raised |
+| Middle (home) | normal, with normal-home in the centre | Home bump to the front | normal, home in the centre |
+| Front (lower) | raised-lower | Tall edge to the front, at the triangle | raised |
+
+- Every cap's light-bar slot goes to the back, toward the two dashes engraved behind each socket, the same as on the board. The raised caps' tall edges face away from the home row.
+- For the inner three columns (middle, index, inner), the index finger is the centre column on both halves, so the home cap and home pad go in the centre. For the outer three, use a normal cap and pad there.
+- The pads are the same three as in v4 and need no reprinting. The upper and home row pegs are turned 180° from the lower row, so each pad turns with its cap and presses the right way. In the keycap STLs the light bar is at −y on every cap except raised-lower, which is why only the lower row isn't turned.
 
 ## Error-proofing
 
 | Possible mistake | What stops it |
 |---|---|
 | Clamp turned round or upside down | One bolt (the cut-off corner) sits 5 mm off the corner, so the holes only line up one way. The cut corner on the base and clamp shows you which way. |
-| Pad on backwards | The keyed corner on the peg only fits one way. |
-| Raised cap under a normal or home pad, or a raised cap turned round | The pad face doesn't match, so the clamp stops several mm above the frame. If you feel resistance before the clamp touches the frame, stop and check. |
-| Normal cap under a raised pad, or home vs normal pad mixed up | Not caught physically: the pad just won't press the cap evenly. Check that each pad matches the cap below it before clamping. |
+| Pad on backwards | The keyed corner on the peg only fits one way, and that way matches the cap below it. |
+| Raised cap turned round, or under a normal or home pad | The pad face doesn't match, so the clamp stops several mm above the frame. If you feel resistance before the clamp touches the frame, stop and check. |
+| Normal or home cap turned round | The light bar ends up at the front, away from the dashes. A home cap turned round also puts its bump under the flat part of the pad. Check the light bars before clamping. |
+| Normal cap under a raised pad, or home vs normal pad mixed up | Not caught physically: the pad just won't press the cap evenly. Check that each pad matches the cap below it. |
 
 ## Parts
 
@@ -39,7 +48,7 @@ Every socket is the same, so any cap can go in any of the nine positions. Lay ou
 | `pinjig_pads/pinjig_pad_normal.stl` | TPU 95A | per normal cap | Exported flat back down, with the shaped face on top and the keyed socket open to the bed. Prints without supports; the only bridge is the 3.6 mm socket ceiling. 2 walls, ~15% gyroid, so it stays soft. |
 | `pinjig_pads/pinjig_pad_home.stl` | TPU 95A | per home cap | Has a relief for the homing bump. |
 | `pinjig_pads/pinjig_pad_raised.stl` | TPU 95A | per raised cap | The same pad works for raised-lower and raised-upper. Their tops match within 0.01 mm, and the pad bridges both light-bar positions. Thinnest point 1.7 mm, at the tall edge. |
-| `pinjig_fit_test.stl` | PETG | 1 | Four single bosses at 0.05 / 0.10 / 0.15 / 0.20 mm clearance (1–4 dots). Unchanged since v3, as are all three pads. |
+| `pinjig_fit_test.stl` | PETG | 1 | Four single bosses at 0.05 / 0.10 / 0.15 / 0.20 mm clearance (1–4 dots). Unchanged since v3, as are all three pads. Pads printed for v4 fit v5. |
 
 Hardware: 4× M3×20 hex-head screws, fully threaded, and 4× M3 wing nuts.
 
@@ -68,8 +77,8 @@ Hardware: 4× M3×20 hex-head screws, fully threaded, and 4× M3 wing nuts.
 
 1. Drop a pin into each boss, legs down through the slots. Its base face should sit flat on the boss.
 2. Put a thin layer of slurry in the keycap pocket, or on the pin's tapered top.
-3. Lower the cap onto the boss and press lightly. The skirt centres it. **Raised caps go tall edge toward the small triangle** engraved in front of each boss.
-4. Press the right pad onto each clamp peg. The cut corner of the socket keys it, so a pad only fits one way round.
+3. Lower the cap onto the boss and press lightly. The skirt centres it. **Light bar to the back** (toward the dashes). Raised caps go **tall edge toward the triangle**, which is at the back for the upper row and at the front for the lower row.
+4. Press the matching pad onto each clamp peg: raised pads on the back and front rows, normal pads in the middle row, and the home pad in the centre for the inner columns. The cut corner of the socket keys it, so a pad only fits one way round.
 5. Lower the clamp over the four screws and spin the wing nuts down until the clamp sits on the frame. Finger tight is enough.
 6. Leave it clamped for at least an hour, then take the clamp off and lift the caps out. Let them rest overnight before fitting them to a board. These times are starting points, not measured. If a pin leg sticks, push it out from underneath through the slot.
 
