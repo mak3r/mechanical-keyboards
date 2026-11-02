@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overlay placement</title>
+<style>
+:root {
+  --bg: #f4f4f1; --panel: #ffffff; --ink: #1d2321; --muted: #66706c; --line: #d9dcd8;
+  --accent: #30ba78; --cap: #0c322c; --case: #24443e; --cover: #1a3b35; --plate: #3d5a54;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121615; --panel: #1b2120; --ink: #e8ece9; --muted: #98a39e; --line: #2d3532;
+    --cap: #2c5a50; --case: #3a5f57; --cover: #31544c; --plate: #4a6a63;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121615; --panel: #1b2120; --ink: #e8ece9; --muted: #98a39e; --line: #2d3532;
+  --cap: #2c5a50; --case: #3a5f57; --cover: #31544c; --plate: #4a6a63;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px; min-height: 100vh; }
+@media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  position: relative; touch-action: none; min-height: 360px; }
+.stage svg { width: 100%; height: 100%; display: block; cursor: grab; user-select: none; }
+.stage svg.dragging { cursor: grabbing; }
+.hint { position: absolute; left: 12px; bottom: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px;
+  display: flex; flex-direction: column; gap: 14px; align-self: start; }
+h1 { font-size: 16px; margin: 0; }
+.sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.ctl label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.ctl .row { display: flex; gap: 8px; align-items: center; }
+.ctl input[type=range] { flex: 1; accent-color: var(--accent); }
+.ctl input[type=number] { width: 84px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--ink); font: inherit; }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 13px; }
+.stats span:nth-child(even) { text-align: right; font-variant-numeric: tabular-nums; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 6px;
+  padding: 6px 10px; font: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select { width: 100%; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--ink); font: inherit; }
+.stage.drop { outline: 3px dashed var(--accent); outline-offset: -6px; }
+pre { margin: 0; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  font-size: 12px; overflow-x: auto; }
+.toggles { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.cap { fill: var(--cap); } .case { fill: var(--case); } .plate { fill: var(--plate); } .cover { fill: var(--cover); }
+.lbl { fill: #9fb3ad; font-size: 2.6px; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="clipLow"></clipPath><clipPath id="clipHigh"></clipPath></defs>
+      <g id="flip">
+        <g id="partsLow"></g>
+        <g clip-path="url(#clipLow)"><path id="inlayLow" class="gfx" fill-rule="evenodd"></path></g>
+        <g id="partsHigh"></g>
+        <path id="ghost" class="gfx" fill-rule="evenodd"></path>
+        <g clip-path="url(#clipHigh)"><path id="inlay" class="gfx" fill-rule="evenodd"></path></g>
+      </g>
+      <g id="labels"></g>
+    </svg>
+    <div class="hint">Drag to move · wheel to scale · shift+wheel to rotate · arrow keys nudge (shift = 2 mm) · [ ] rotate · + − scale</div>
+  </div>
+  <div class="panel">
+    <div>
+      <h1 id="title">Overlay placement</h1>
+      <div class="sub" id="subtitle"></div>
+    </div>
+    <div class="ctl">
+      <label><span>Scale (% of start)</span><span id="scaleAbs"></span></label>
+      <div class="row"><input type="range" id="scaleR" min="40" max="160" step="0.5"><input type="number" id="scaleN" step="0.5"></div>
+    </div>
+    <div class="ctl">
+      <label><span>Rotation (° counter-clockwise)</span></label>
+      <div class="row"><input type="range" id="rotR" min="-45" max="45" step="0.5"><input type="number" id="rotN" step="0.5"></div>
+    </div>
+    <div class="ctl">
+      <label><span>X center (mm, board frame)</span></label>
+      <div class="row"><input type="range" id="xR" step="0.5"><input type="number" id="xN" step="0.5"></div>
+    </div>
+    <div class="ctl">
+      <label><span>Y center (mm, board frame)</span></label>
+      <div class="row"><input type="range" id="yR" step="0.5"><input type="number" id="yN" step="0.5"></div>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="showGhost" checked> outline of whole graphic</label>
+      <label><input type="checkbox" id="showLbl" checked> key names</label>
+      <label id="plateToggle"><input type="checkbox" id="usePlate" checked> switch plate</label>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="btns">
+      <button class="primary" id="save">Save config</button>
+      <button id="copy">Copy placement</button>
+      <button id="reset">Reset</button>
+      <button id="load">Load configs…</button>
+      <input type="file" id="loadFile" accept=".json,application/json" multiple hidden>
+    </div>
+    <div class="ctl" id="loadedBox" hidden>
+      <label><span>Loaded configs (pick one to review)</span></label>
+      <select id="loaded"></select>
+      <div class="sub" id="loadMsg"></div>
+    </div>
+    <pre id="out"></pre>
+    <div class="sub">Save the config into <code>keycaps/overlay/configs/</code>, then run
+      <code>python3 overlay.py configs/&lt;file&gt;.json</code>. Colors on the stage are a preview only; the inlay
+      follows each cap's top edge.</div>
+  </div>
+</div>
+<script>
+const D = /*DATA*/null;
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const st = { ...D.start };
+const svg = $('svg');
+const [vx, vy, vw, vh] = D.view;
+
+// y-up board frame inside a y-down SVG
+svg.setAttribute('viewBox', `${vx} ${-(vy + vh)} ${vw} ${vh}`);
+$('flip').setAttribute('transform', 'scale(1,-1)');
+$('title').textContent = `${D.name}: ${D.half} half`;
+$('subtitle').textContent = `from ${D.config_file}`;
+document.documentElement.style.setProperty('--accent', D.colors.inlay || '#30ba78');
+
+for (const kind of ['case', 'plate', 'cover', 'cap']) {
+  for (const p of D.parts.filter(p => p.kind === kind)) {
+    const el = document.createElementNS(NS, 'path');
+    el.setAttribute('d', p.d); el.setAttribute('class', kind); el.setAttribute('fill-rule', 'evenodd');
+    // case and plate sit under the caps: their inlay is drawn first and the caps cover it
+    const low = kind === 'case' || kind === 'plate';
+    $(low ? 'partsLow' : 'partsHigh').appendChild(el);
+    const c = el.cloneNode(); c.removeAttribute('class'); c.setAttribute('clip-rule', 'evenodd');
+    $(low ? 'clipLow' : 'clipHigh').appendChild(c);
+    if (kind === 'plate') { el.classList.add('platePart'); c.classList.add('platePart'); }
+    if (kind !== 'case' && kind !== 'plate') {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', p.x); t.setAttribute('y', -p.y); t.setAttribute('class', 'lbl');
+      t.textContent = p.id; $('labels').appendChild(t);
+    }
+  }
+}
+for (const id of ['ghost', 'inlay', 'inlayLow']) $(id).setAttribute('d', D.graphic);
+$('inlayLow').style.fill = 'var(--accent)';
+$('inlayLow').style.opacity = 0.7;   // slightly dimmer so plate color reads apart from the caps
+$('ghost').style.fill = 'var(--accent)';
+$('ghost').style.opacity = 0.22;
+$('inlay').style.fill = 'var(--accent)';
+
+// slider ranges
+const xr = [vx, vx + vw], yr = [vy, vy + vh];
+Object.assign($('xR'), { min: xr[0].toFixed(0), max: xr[1].toFixed(0) });
+Object.assign($('yR'), { min: yr[0].toFixed(0), max: yr[1].toFixed(0) });
+
+const r2 = v => Math.round(v * 100) / 100;
+function placement() {
+  return { fit: 'none', scale: Math.round(st.scale * 1e4) / 1e4, rotate: r2(st.rotate), offset: [r2(st.x), r2(st.y)] };
+}
+function render(fromInput) {
+  const tf = `translate(${st.x} ${st.y}) rotate(${st.rotate}) scale(${st.scale})`;
+  for (const id of ['ghost', 'inlay', 'inlayLow']) $(id).setAttribute('transform', tf);
+  const pct = st.scale / D.start.scale * 100;
+  if (fromInput !== 'scale') { $('scaleR').value = pct.toFixed(1); $('scaleN').value = pct.toFixed(1); }
+  if (fromInput !== 'rot') { $('rotR').value = st.rotate; $('rotN').value = r2(st.rotate); }
+  if (fromInput !== 'x') { $('xR').value = st.x; $('xN').value = r2(st.x); }
+  if (fromInput !== 'y') { $('yR').value = st.y; $('yN').value = r2(st.y); }
+  $('scaleAbs').textContent = `${st.scale.toFixed(4)} mm / SVG unit`;
+  $('out').textContent = '"placement": ' + JSON.stringify(placement(), null, 2);
+  scheduleStats();
+}
+
+// coverage stats by rasterising at 4 px/mm
+const PX = 4;
+const cv = document.createElement('canvas');
+cv.width = Math.ceil(vw * PX); cv.height = Math.ceil(vh * PX);
+const cx = cv.getContext('2d', { willReadFrequently: true });
+const gPath = new Path2D(D.graphic);
+const partPaths = D.parts.map(p => ({ kind: p.kind, id: p.id, path: new Path2D(p.d) }));
+function boardTf() { cx.setTransform(PX, 0, 0, -PX, -vx * PX, (vy + vh) * PX); }
+function mask(drawFn) {
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, cv.width, cv.height);
+  boardTf(); cx.fillStyle = '#000'; drawFn();
+  const a = cx.getImageData(0, 0, cv.width, cv.height).data;
+  const m = new Uint8Array(cv.width * cv.height);
+  for (let i = 0; i < m.length; i++) m[i] = a[i * 4 + 3] > 127;
+  return m;
+}
+const partMasks = {};
+for (const kind of ['cap', 'case', 'plate', 'cover'])
+  partMasks[kind] = mask(() => partPaths.filter(p => p.kind === kind).forEach(p => cx.fill(p.path, 'evenodd')));
+let timer = null;
+function scheduleStats() { clearTimeout(timer); timer = setTimeout(stats, 60); }
+function stats() {
+  const g = mask(() => {
+    cx.translate(st.x, st.y); cx.rotate(st.rotate * Math.PI / 180); cx.scale(st.scale, st.scale);
+    cx.fill(gPath, 'evenodd');
+  });
+  let tot = 0; const on = { cap: 0, case: 0, plate: 0, cover: 0 };
+  for (let i = 0; i < g.length; i++) if (g[i]) {
+    tot++;
+    for (const k of ['cap', 'cover', 'case', 'plate']) if (partMasks[k][i] && (k !== 'plate' || usePlate)) { on[k]++; break; }
+  }
+  const pct = v => tot ? (v / tot * 100).toFixed(1) + '%' : '–';
+  const lost = tot - on.cap - on.case - on.plate - on.cover;
+  $('stats').innerHTML =
+    `<span>Graphic on keycaps</span><span>${pct(on.cap)}</span>` +
+    `<span>on case rim</span><span>${pct(on.case)}</span>` +
+    `<span>on nice!view cover</span><span>${pct(on.cover)}</span>` +
+    `<span>on switch plate (between keys)</span><span>${pct(on.plate)}</span>` +
+    `<span>between parts (not printed)</span><span>${pct(lost)}</span>`;
+}
+
+// inputs
+function bind(rId, nId, key, conv, back) {
+  for (const id of [rId, nId]) $(id).addEventListener('input', e => {
+    const v = parseFloat(e.target.value); if (isNaN(v)) return;
+    st[key] = conv(v); render(back);
+    if (id === rId) $(nId).value = v; else $(rId).value = v;
+  });
+}
+bind('scaleR', 'scaleN', 'scale', v => v / 100 * D.start.scale, 'scale');
+bind('rotR', 'rotN', 'rotate', v => v, 'rot');
+bind('xR', 'xN', 'x', v => v, 'x');
+bind('yR', 'yN', 'y', v => v, 'y');
+
+// drag
+function toBoard(evt) {
+  const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: p.x, y: -p.y };
+}
+let drag = null;
+svg.addEventListener('pointerdown', e => {
+  drag = { p: toBoard(e), x: st.x, y: st.y }; svg.setPointerCapture(e.pointerId); svg.classList.add('dragging');
+});
+svg.addEventListener('pointermove', e => {
+  if (!drag) return; const p = toBoard(e);
+  st.x = drag.x + p.x - drag.p.x; st.y = drag.y + p.y - drag.p.y; render();
+});
+const end = () => { drag = null; svg.classList.remove('dragging'); };
+svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const d = e.deltaY > 0 ? -1 : 1;
+  if (e.shiftKey) st.rotate += d * 0.5; else st.scale *= (1 + d * 0.01);
+  render();
+}, { passive: false });
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const step = e.shiftKey ? 2 : 0.5; let hit = true;
+  if (e.key === 'ArrowLeft') st.x -= step; else if (e.key === 'ArrowRight') st.x += step;
+  else if (e.key === 'ArrowUp') st.y += step; else if (e.key === 'ArrowDown') st.y -= step;
+  else if (e.key === '[') st.rotate += 0.5; else if (e.key === ']') st.rotate -= 0.5;
+  else if (e.key === '+' || e.key === '=') st.scale *= 1.005; else if (e.key === '-') st.scale /= 1.005;
+  else hit = false;
+  if (hit) { e.preventDefault(); render(); }
+});
+$('showGhost').addEventListener('change', e => $('ghost').style.display = e.target.checked ? '' : 'none');
+$('showLbl').addEventListener('change', e => $('labels').style.display = e.target.checked ? '' : 'none');
+// Switch plate on/off: hides it here, drops it from the stats, and saves the config without it
+let usePlate = D.plate_on;
+if (!D.parts.some(p => p.kind === 'plate')) $('plateToggle').style.display = 'none';
+function applyPlate() {
+  $('usePlate').checked = usePlate;
+  document.querySelectorAll('.platePart').forEach(el => el.style.display = usePlate ? '' : 'none');
+}
+applyPlate();
+$('usePlate').addEventListener('change', e => { usePlate = e.target.checked; applyPlate(); render(); });
+$('reset').addEventListener('click', () => { Object.assign(st, D.start); render(); });
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('out').textContent); $('copy').textContent = 'Copied'; }
+  catch { $('copy').textContent = 'Select the text below'; }
+  setTimeout(() => $('copy').textContent = 'Copy placement', 1500);
+});
+$('save').addEventListener('click', () => {
+  const cfg = JSON.parse(JSON.stringify(current.config));
+  cfg.placement = { ...(cfg.placement || {}), ...placement() };
+  if (cfg.plate) cfg.plate.enabled = usePlate;
+  delete cfg.placement.margin;
+  const blob = new Blob([JSON.stringify(cfg, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = current.file; a.click(); URL.revokeObjectURL(a.href);
+});
+// ---- loading saved configs: pick files or drop them on the stage; switch between them in the list
+let current = { file: D.config_file, config: D.config };
+const loaded = [];
+function applyConfig(entry) {
+  const P = entry.config.placement || {};
+  current = entry;
+  $('subtitle').textContent = `from ${entry.file}`;
+  if (P.fit === 'none' && P.scale && P.offset) {
+    Object.assign(st, { scale: P.scale, rotate: P.rotate || 0, x: P.offset[0], y: P.offset[1] });
+    $('loadMsg').textContent = '';
+  } else {
+    $('loadMsg').textContent = `${entry.file} uses fit "${P.fit || 'right'}", which this page can't reproduce. ` +
+      `Run placement_tool.py on it to see that placement. Its other settings are loaded.`;
+  }
+  if (D.parts.some(p => p.kind === 'plate')) { usePlate = !!(entry.config.plate && entry.config.plate.enabled !== false); applyPlate(); }
+  render();
+}
+async function loadFiles(files) {
+  for (const f of files) {
+    try {
+      const cfg = JSON.parse(await f.text());
+      if (!cfg.placement) throw new Error('no "placement" in it');
+      const i = loaded.findIndex(e => e.file === f.name);
+      const entry = { file: f.name, config: cfg };
+      if (i >= 0) loaded[i] = entry; else loaded.push(entry);
+    } catch (err) { $('loadMsg').textContent = `${f.name}: ${err.message}`; $('loadedBox').hidden = false; }
+  }
+  if (!loaded.length) return;
+  const sel = $('loaded');
+  sel.innerHTML = '';
+  for (const [i, e] of [{ file: D.config_file + ' (as built)', config: D.config }, ...loaded].entries()) {
+    const o = document.createElement('option'); o.value = i; o.textContent = e.file; sel.appendChild(o);
+  }
+  $('loadedBox').hidden = false;
+  sel.value = loaded.length;               // show the last file loaded
+  applyConfig(loaded[loaded.length - 1]);
+}
+$('loaded').addEventListener('change', e => {
+  const i = +e.target.value;
+  applyConfig(i === 0 ? { file: D.config_file, config: D.config } : loaded[i - 1]);
+});
+$('load').addEventListener('click', () => $('loadFile').click());
+$('loadFile').addEventListener('change', e => { loadFiles([...e.target.files]); e.target.value = ''; });
+const stage = $('stage');
+stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('drop'); });
+stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
+stage.addEventListener('drop', e => {
+  e.preventDefault(); stage.classList.remove('drop');
+  loadFiles([...e.dataTransfer.files].filter(f => f.name.endsWith('.json')));
+});
+render();
+</script>
+</body>
+</html>

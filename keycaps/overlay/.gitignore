@@ -1,0 +1,6 @@
+# local work: your configs, graphics and generated results
+configs/
+graphics/
+out/
+.venv/
+__pycache__/
